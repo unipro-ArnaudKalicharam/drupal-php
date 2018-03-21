@@ -1,3 +1,46 @@
+FROM drush/drush:8 as intermediate
+
+RUN apt-get update && apt-get install git && \
+    rm -rf /var/lib/apt/lists/* && \
+    mkdir /root/.ssh && \
+    touch /root/.ssh/known_hosts && \
+    echo "Listing /root" && \
+    ls -al /
+
+COPY .ssh /root/.ssh
+
+RUN chmod 400 -R /root/.ssh
+
+ENV PFIZER_GIT_USER="pfizer" \
+    DEV_GIT_USER="unipro-ArnaudKalicharam" \
+    PLATFORM_PFIZER_REPO="platform-pfizer" \
+    PLATFORM_BRANCH="7.x-3.x-dev" \
+    PLATFORM_QWH_REPO="platform-qwh" \
+    PLATFORM_QWH_BRANCH="7.x-qwh-1.0.x-dev" \
+    MAKE_FILE="drupal.make"
+
+RUN mkdir /git /web && \
+    cd /git && \
+    ssh-keyscan github.com >> /root/.ssh/known_hosts && \
+    eval "$(ssh-agent -s)" && \
+    ssh-add /root/.ssh/id_rsa && \
+    ls -al && \
+    git clone git@github.com:${DEV_GIT_USER}/${PLATFORM_QWH_REPO}.git && \
+    cd /git/${PLATFORM_QWH_REPO} && \
+    ls /git/${PLATFORM_QWH_REPO} && \
+    git fetch --all && \
+    git checkout ${PLATFORM_QWH_BRANCH} && \
+    ls /git/${PLATFORM_QWH_REPO} && \
+    git pull && \
+    cp /git/${PLATFORM_QWH_REPO}/${MAKE_FILE} /web
+
+RUN cd /web && \
+    ls -al && \
+    drush status && \
+    drush make ${MAKE_FILE} --force-complete -y
+
+RUN echo "Dont forget to bring all changes to this makefile to other dockerfiles."
+
 ARG FROM_TAG
 
 FROM wodby/php:${FROM_TAG}
